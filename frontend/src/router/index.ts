@@ -8,6 +8,7 @@ const Experiment = () => import('@/views/experiment/index.vue')
 const QueryBuilder = () => import('@/views/query_builder/index.vue')
 const Dashboard = () => import('@/views/dashboard/index.vue')
 const Chart = () => import('@/views/chart/index.vue')
+const ChartCompare = () => import('@/views/chart_compare/index.vue')
 const DataService = () => import('@/views/data_service/index.vue')
 const Alert = () => import('@/views/alert/index.vue')
 const UserGroup = () => import('@/views/user_group/index.vue')
@@ -31,6 +32,7 @@ const router = createRouter({
     { path: '/query_builder', name: 'query_builder', component: QueryBuilder },
     { path: '/dashboard', name: 'dashboard', component: Dashboard },
     { path: '/chart', name: 'chart', component: Chart },
+    { path: '/chart_compare', name: 'chart_compare', component: ChartCompare },
     { path: '/data_service', name: 'data_service', component: DataService },
     { path: '/alert', name: 'alert', component: Alert },
     { path: '/user_group', name: 'user_group', component: UserGroup },

@@ -56,6 +56,7 @@ npm run dev
 | OLAP查询 | `query_builder` | 查询模板 | 模板编号、模板名称、查询语句 |
 | 数据看板 | `dashboard` | 看板配置 | 看板编号、看板名称、包含图表 |
 | 图表配置 | `chart` | 图表 | 图表编号、图表名称、图表类型 |
+| 图表分桶对比 | `chart_bucketing` | 图表数据快照、两期对比 | 数据来源、分桶边界、桶行数、数值覆盖、缺失值、指纹 |
 | 数据API发布 | `data_service` | 数据服务 | 服务编号、服务名称、输出数据集 |
 | 智能告警 | `alert` | 告警规则 | 规则编号、告警名称、监控指标 |
 | 分析用户组 | `user_group` | 用户组 | 组编号、组名称、组描述 |
@@ -74,3 +75,45 @@ npm run dev
   `backend/app/routers/<模块>.py`，业务规则在 `backend/app/services/<模块>.py`。
 - 列表接口统一返回 `{ items, total, page, size }`，动作接口统一返回 `{ ok, message }`。
 - 状态流转只允许在 `app/services` 里改，路由层不做业务判断。
+
+## 图表分桶聚合与两期对比（`chart_bucketing`）
+
+纯标准库计算引擎在 `backend/app/bucketing/`（`spec.py` 分桶口径、`snapshot.py`
+可重算快照、`comparison.py` 两期对比），应用服务在
+`app/services/chart_bucketing.py`，接口前缀 `/api/chart-bucketing`，前端页面
+`/chart_compare`（导航「图表分桶对比」）。
+
+### 分桶口径
+
+- 边界严格递增，区间固定为左闭右开 `[edge_i, edge_{i+1})`，区间连续且边界值
+  只入一个桶（`bisect_right`，如 10 进 `[10,20)`、20 进溢出桶）。
+- 可选下溢桶 `(-∞, e0)` 与溢出桶 `[en, +∞)`；空桶保留 0 行。
+- 缺失值（`None`、空串、`NaN`、不可解析文本、布尔）不进数值桶，单独统计数量
+  与坐标；总行数 = 分桶行数 + 缺失行数 = 输入行数。
+- 快照保存输入记录指纹与聚合结果指纹，`POST /snapshots/{id}/recompute`
+  用输入记录和原口径逐字段复算，指纹不一致直接拒绝。
+
+### 两期对比的两种口径
+
+后一批观测超出旧分桶上限时，对比视图同时支持：
+
+- `overflow` 保留旧桶 + 溢出区：旧桶人数按原快照复现，溢出值并入无界开放桶，
+  开放区间标为「有限可比」（行数可对照、分辨率不可比）并进入不可直接比较清单；
+- `replay` 统一新桶重放：两期用同一新边界各算一版，全部有限桶可直接比较，
+  尾部有完整分辨率；旧桶人数仍可在重放结果上还原。
+
+`mode` 不传时按「口径是否一致、对照期开放桶是否有数据」自动识别。
+
+### 内置对照数据
+
+`backend/data/period_1.csv`（5、19）与 `period_2.csv`（5、20、35），服务启动时
+自动生成旧桶版、统一新桶重放版与缺失值示例快照 `SNAP-B0001` ~ `SNAP-B0005`。
+
+### 测试
+
+```bash
+cd backend
+python3 -m unittest discover -s tests -v          # 纯标准库即可跑引擎测试
+PYTHONPATH=<.pydeps 或 venv site-packages> python3 -m unittest discover -s tests -v
+```
+
